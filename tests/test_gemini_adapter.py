@@ -518,8 +518,8 @@ class TestParseStream:
                                     "functionCall": {
                                         "name": "search",
                                         "args": {"q": "test"},
-                                        "thought_signature": "abc123sig",
                                     },
+                                    "thoughtSignature": "abc123sig",
                                 }
                             ],
                             "role": "model",
@@ -621,8 +621,8 @@ class TestSerializeThoughtSignature:
             "functionCall": {
                 "name": "get_weather",
                 "args": {"city": "Paris"},
-                "thought_signature": "sig_xyz",
             },
+            "thoughtSignature": "sig_xyz",
         }
 
     def test_no_thought_signature_when_none(self) -> None:
@@ -697,6 +697,6 @@ class TestSerializeThoughtSignature:
             "functionCall": {
                 "name": "search",
                 "args": {},
-                "thought_signature": "fc_sig",
             },
+            "thoughtSignature": "fc_sig",
         }

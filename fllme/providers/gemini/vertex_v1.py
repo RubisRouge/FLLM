@@ -159,12 +159,15 @@ class GeminiVertexV1:
                         accumulate_content(accumulated, TextContent(text=text))
                     elif fc := part.get("functionCall"):
                         has_tool_calls = True
+                        sig = part.get("thoughtSignature") or part.get(
+                            "thought_signature"
+                        )
                         accumulated.append(
                             ToolCallContent(
                                 id=fc.get("id", uuid.uuid4().hex[:12]),
                                 name=fc["name"],
                                 arguments=fc.get("args", {}),
-                                thought_signature=fc.get("thought_signature"),
+                                thought_signature=sig,
                             )
                         )
 
@@ -225,9 +228,10 @@ def _serialize_parts(
                 parts.append({"fileData": {"mimeType": mt, "fileUri": url}})
             case ToolCallContent(name=name, arguments=args, thought_signature=sig):
                 fc_part: dict[str, Any] = {"name": name, "args": args}
+                part_dict: dict[str, Any] = {"functionCall": fc_part}
                 if sig:
-                    fc_part["thought_signature"] = sig
-                parts.append({"functionCall": fc_part})
+                    part_dict["thoughtSignature"] = sig
+                parts.append(part_dict)
             case ToolResponseContent(tool_call_id=call_id, content=text):
                 fn_name = tool_name_map.get(call_id, call_id)
                 try:
