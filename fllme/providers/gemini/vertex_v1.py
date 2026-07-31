@@ -147,9 +147,13 @@ class GeminiVertexV1:
 
                 for part in candidate.get("content", {}).get("parts", []):
                     if part.get("thought") and (text := part.get("text")):
-                        sig = part.get("thoughtSignature") or part.get("thought_signature")
+                        sig = part.get("thoughtSignature") or part.get(
+                            "thought_signature"
+                        )
                         yield ThinkingDelta(thinking=text)
-                        accumulate_content(accumulated, ThinkingContent(thinking=text, signature=sig))
+                        accumulate_content(
+                            accumulated, ThinkingContent(thinking=text, signature=sig)
+                        )
                     elif text := part.get("text"):
                         yield TextDelta(text=text)
                         accumulate_content(accumulated, TextContent(text=text))
