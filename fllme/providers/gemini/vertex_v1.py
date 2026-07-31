@@ -147,8 +147,9 @@ class GeminiVertexV1:
 
                 for part in candidate.get("content", {}).get("parts", []):
                     if part.get("thought") and (text := part.get("text")):
+                        sig = part.get("thoughtSignature") or part.get("thought_signature")
                         yield ThinkingDelta(thinking=text)
-                        accumulate_content(accumulated, ThinkingContent(thinking=text))
+                        accumulate_content(accumulated, ThinkingContent(thinking=text, signature=sig))
                     elif text := part.get("text"):
                         yield TextDelta(text=text)
                         accumulate_content(accumulated, TextContent(text=text))
@@ -159,6 +160,7 @@ class GeminiVertexV1:
                                 id=fc.get("id", uuid.uuid4().hex[:12]),
                                 name=fc["name"],
                                 arguments=fc.get("args", {}),
+                                thought_signature=fc.get("thought_signature"),
                             )
                         )
 
@@ -206,14 +208,22 @@ def _serialize_parts(
     parts: list[dict[str, Any]] = []
     for content in msg.contents:
         match content:
+            case ThinkingContent(thinking=text, signature=sig):
+                thought_part: dict[str, Any] = {"text": text, "thought": True}
+                if sig:
+                    thought_part["thoughtSignature"] = sig
+                parts.append(thought_part)
             case TextContent(text=text):
                 parts.append({"text": text})
             case MediaContent(source=Base64Source(data=data), media_type=mt):
                 parts.append({"inlineData": {"mimeType": mt, "data": data}})
             case MediaContent(source=UrlSource(url=url), media_type=mt):
                 parts.append({"fileData": {"mimeType": mt, "fileUri": url}})
-            case ToolCallContent(name=name, arguments=args):
-                parts.append({"functionCall": {"name": name, "args": args}})
+            case ToolCallContent(name=name, arguments=args, thought_signature=sig):
+                fc_part: dict[str, Any] = {"name": name, "args": args}
+                if sig:
+                    fc_part["thought_signature"] = sig
+                parts.append({"functionCall": fc_part})
             case ToolResponseContent(tool_call_id=call_id, content=text):
                 fn_name = tool_name_map.get(call_id, call_id)
                 try:

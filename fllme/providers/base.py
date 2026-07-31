@@ -32,7 +32,8 @@ def accumulate_content(accumulated: list[Content], item: Content) -> None:
     ):
         last = accumulated[-1]
         accumulated[-1] = ThinkingContent(
-            thinking=last.thinking + item.thinking, signature=last.signature
+            thinking=last.thinking + item.thinking,
+            signature=item.signature or last.signature,
         )
     else:
         accumulated.append(item)

@@ -53,6 +53,7 @@ class ToolCallContent(BaseModel):
     id: str
     name: str
     arguments: dict[str, Any]
+    thought_signature: str | None = None
 
 
 class ToolResponseContent(BaseModel):

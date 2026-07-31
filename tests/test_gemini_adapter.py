@@ -20,6 +20,7 @@ from fllme.models.message import (
     Message,
     MessageSource,
     TextContent,
+    ThinkingContent,
     ToolCallContent,
     ToolResponseContent,
     UrlSource,
@@ -503,3 +504,199 @@ class TestParseStream:
 
         assert isinstance(results[0], TextDelta)
         assert isinstance(results[1], GenerationOutput)
+
+    @pytest.mark.asyncio
+    async def test_function_call_with_thought_signature(self) -> None:
+        adapter = GeminiVertexV1()
+        chunks: list[dict[str, Any]] = [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "search",
+                                        "args": {"q": "test"},
+                                        "thought_signature": "abc123sig",
+                                    },
+                                }
+                            ],
+                            "role": "model",
+                        },
+                        "finishReason": "STOP",
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 5,
+                    "totalTokenCount": 15,
+                },
+            },
+        ]
+
+        results: list[Any] = []
+        async for item in adapter.parse_stream(_lines_from(chunks)):
+            results.append(item)
+
+        out: GenerationOutput = results[0]
+        tc = out.message.contents[0]
+        assert isinstance(tc, ToolCallContent)
+        assert tc.thought_signature == "abc123sig"
+
+    @pytest.mark.asyncio
+    async def test_function_call_without_thought_signature(self) -> None:
+        adapter = GeminiVertexV1()
+        chunks: list[dict[str, Any]] = [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "search",
+                                        "args": {"q": "test"},
+                                    },
+                                }
+                            ],
+                            "role": "model",
+                        },
+                        "finishReason": "STOP",
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 5,
+                    "totalTokenCount": 15,
+                },
+            },
+        ]
+
+        results: list[Any] = []
+        async for item in adapter.parse_stream(_lines_from(chunks)):
+            results.append(item)
+
+        out: GenerationOutput = results[0]
+        tc = out.message.contents[0]
+        assert isinstance(tc, ToolCallContent)
+        assert tc.thought_signature is None
+
+
+class TestSerializeThoughtSignature:
+    def test_thought_signature_echoed_in_function_call(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = GenerationInput(
+            model="gemini-2.5-flash",
+            conversation=[
+                Message(
+                    source=MessageSource.USER,
+                    contents=[TextContent(text="Weather?")],
+                ),
+                Message(
+                    source=MessageSource.MODEL,
+                    contents=[
+                        ToolCallContent(
+                            id="call_1",
+                            name="get_weather",
+                            arguments={"city": "Paris"},
+                            thought_signature="sig_xyz",
+                        ),
+                    ],
+                ),
+                Message(
+                    source=MessageSource.TOOL,
+                    contents=[
+                        ToolResponseContent(
+                            tool_call_id="call_1",
+                            content='{"temp": 22}',
+                        ),
+                    ],
+                ),
+            ],
+        )
+        payload = adapter.serialize(inp)
+        fc_part = payload["contents"][1]["parts"][0]
+        assert fc_part == {
+            "functionCall": {
+                "name": "get_weather",
+                "args": {"city": "Paris"},
+                "thought_signature": "sig_xyz",
+            },
+        }
+
+    def test_no_thought_signature_when_none(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = GenerationInput(
+            model="gemini-2.5-flash",
+            conversation=[
+                Message(
+                    source=MessageSource.MODEL,
+                    contents=[
+                        ToolCallContent(
+                            id="call_1",
+                            name="get_weather",
+                            arguments={"city": "Paris"},
+                        ),
+                    ],
+                ),
+            ],
+        )
+        payload = adapter.serialize(inp)
+        fc_part = payload["contents"][0]["parts"][0]
+        assert fc_part == {
+            "functionCall": {"name": "get_weather", "args": {"city": "Paris"}},
+        }
+
+    def test_thinking_content_serialized(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = GenerationInput(
+            model="gemini-2.5-flash",
+            conversation=[
+                Message(
+                    source=MessageSource.MODEL,
+                    contents=[
+                        ThinkingContent(thinking="let me think..."),
+                        TextContent(text="Answer"),
+                    ],
+                ),
+            ],
+        )
+        payload = adapter.serialize(inp)
+        parts = payload["contents"][0]["parts"]
+        assert parts[0] == {"text": "let me think...", "thought": True}
+        assert parts[1] == {"text": "Answer"}
+
+    def test_thinking_content_with_signature_serialized(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = GenerationInput(
+            model="gemini-2.5-flash",
+            conversation=[
+                Message(
+                    source=MessageSource.MODEL,
+                    contents=[
+                        ThinkingContent(thinking="reasoning...", signature="think_sig"),
+                        ToolCallContent(
+                            id="c1",
+                            name="search",
+                            arguments={},
+                            thought_signature="fc_sig",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        payload = adapter.serialize(inp)
+        parts = payload["contents"][0]["parts"]
+        assert parts[0] == {
+            "text": "reasoning...",
+            "thought": True,
+            "thoughtSignature": "think_sig",
+        }
+        assert parts[1] == {
+            "functionCall": {
+                "name": "search",
+                "args": {},
+                "thought_signature": "fc_sig",
+            },
+        }
