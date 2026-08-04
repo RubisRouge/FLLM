@@ -7,7 +7,7 @@ from .safety import (
     SafetyResult,
     SafetySeverity,
 )
-from .stream import StreamDelta, StreamEventType, TextDelta, ThinkingDelta
+from .stream import MediaDelta, StreamDelta, StreamEventType, TextDelta, ThinkingDelta
 
 __all__ = [
     "CacheUsage",
@@ -15,6 +15,7 @@ __all__ = [
     "CitationType",
     "FinishReason",
     "GenerationOutput",
+    "MediaDelta",
     "SafetyCategory",
     "SafetyRating",
     "SafetyResult",

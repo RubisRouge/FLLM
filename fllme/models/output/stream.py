@@ -5,6 +5,7 @@ from enum import StrEnum
 class StreamEventType(StrEnum):
     TEXT_DELTA = "text_delta"
     THINKING_DELTA = "thinking_delta"
+    MEDIA_DELTA = "media_delta"
 
 
 class TextDelta(BaseModel):
@@ -17,4 +18,10 @@ class ThinkingDelta(BaseModel):
     thinking: str
 
 
-StreamDelta = TextDelta | ThinkingDelta
+class MediaDelta(BaseModel):
+    type: StreamEventType = StreamEventType.MEDIA_DELTA
+    media_type: str
+    data: str
+
+
+StreamDelta = TextDelta | ThinkingDelta | MediaDelta

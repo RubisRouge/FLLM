@@ -5,7 +5,12 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-from ...models.input import GenerationInput, ThinkingLevel, ToolsCallingMode
+from ...models.input import (
+    BasicOutputType,
+    GenerationInput,
+    ThinkingLevel,
+    ToolsCallingMode,
+)
 from ..base import accumulate_content
 from ...models.message import (
     Base64Source,
@@ -22,6 +27,7 @@ from ...models.message import (
 from ...models.output import (
     FinishReason,
     GenerationOutput,
+    MediaDelta,
     SafetyCategory,
     SafetyRating,
     SafetyResult,
@@ -157,6 +163,16 @@ class GeminiVertexV1:
                     elif text := part.get("text"):
                         yield TextDelta(text=text)
                         accumulate_content(accumulated, TextContent(text=text))
+                    elif inline := part.get("inlineData"):
+                        mime = inline.get("mimeType", "application/octet-stream")
+                        data = inline.get("data", "")
+                        yield MediaDelta(media_type=mime, data=data)
+                        accumulated.append(
+                            MediaContent(
+                                media_type=mime,
+                                source=Base64Source(data=data),
+                            )
+                        )
                     elif fc := part.get("functionCall"):
                         has_tool_calls = True
                         sig = part.get("thoughtSignature") or part.get(
@@ -273,6 +289,20 @@ def _build_generation_config(gen_input: GenerationInput) -> dict[str, Any]:
     if isinstance(output_type, type) and hasattr(output_type, "model_json_schema"):
         gen_config["responseMimeType"] = "application/json"
         gen_config["responseSchema"] = output_type.model_json_schema()
+    elif output_type == BasicOutputType.IMAGE:
+        gen_config["responseModalities"] = ["IMAGE"]
+    elif output_type == BasicOutputType.HYBRID:
+        gen_config["responseModalities"] = ["TEXT", "IMAGE"]
+
+    if gen_input.image_config is not None:
+        img = gen_input.image_config
+        image_cfg: dict[str, Any] = {
+            "aspectRatio": img.ratio.value if ":" in img.ratio.value else "auto",
+            "imageSize": img.resolution.value,
+            "personGeneration": img.person_generation.value,
+            "imageOutputOptions": {"mimeType": img.mime_type.value},
+        }
+        gen_config["imageConfig"] = image_cfg
 
     return gen_config
 
