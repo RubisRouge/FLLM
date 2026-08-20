@@ -7,7 +7,7 @@ from .errors import ProviderError
 from .http import get_client
 from .media import MediaResolver
 from .models.input import GenerationInput
-from .models.output import GenerationOutput, StreamDelta
+from .models.output import GenerationOutput, Response
 from .providers import get_adapter
 from .providers.base import Adapter
 from .service import DeploymentService
@@ -33,13 +33,11 @@ async def generate(
     deployment_id: str | None = None,
     service: DeploymentService | None = None,
     media_resolver: MediaResolver | None = None,
-) -> GenerationOutput | AsyncIterator[StreamDelta | GenerationOutput]:
+) -> GenerationOutput | AsyncIterator[Response]:
     svc = service or get_service()
 
     if media_resolver is not None:
-        await media_resolver.resolve_media(
-            generation_input=gen_input
-        )  # Genereation input has now no ReferenceSource anymore
+        await media_resolver.resolve_media(generation_input=gen_input)
 
     deployment = await svc.resolve_deployment(gen_input.model, deployment_id)
     adapter = get_adapter(deployment.adapter)
@@ -75,7 +73,7 @@ async def _stream(
     payload: dict[str, Any],
     adapter: Adapter,
     media_resolver: MediaResolver | None = None,
-) -> AsyncIterator[StreamDelta | GenerationOutput]:
+) -> AsyncIterator[Response]:
     client = get_client()
     async with client.stream("POST", url, headers=headers, json=payload) as response:
         if response.status_code != 200:
@@ -84,4 +82,4 @@ async def _stream(
         async for item in adapter.parse_stream(response.aiter_lines()):
             if isinstance(item, GenerationOutput) and media_resolver is not None:
                 await media_resolver.store_media(item)
-            yield item
+            yield Response(content=item)

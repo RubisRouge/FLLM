@@ -1,4 +1,4 @@
-from .main import FinishReason, GenerationOutput
+from .main import FinishReason, GenerationOutput, Response
 from .usage import CacheUsage, Usage
 from .citation import Citation, CitationType, TextSpan
 from .safety import (
@@ -7,7 +7,7 @@ from .safety import (
     SafetyResult,
     SafetySeverity,
 )
-from .stream import MediaDelta, StreamDelta, StreamEventType, TextDelta, ThinkingDelta
+from .stream import MediaDelta, StreamDelta, TextDelta, ThinkingDelta
 
 __all__ = [
     "CacheUsage",
@@ -16,12 +16,12 @@ __all__ = [
     "FinishReason",
     "GenerationOutput",
     "MediaDelta",
+    "Response",
     "SafetyCategory",
     "SafetyRating",
     "SafetyResult",
     "SafetySeverity",
     "StreamDelta",
-    "StreamEventType",
     "TextDelta",
     "TextSpan",
     "ThinkingDelta",

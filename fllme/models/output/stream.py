@@ -1,27 +1,28 @@
-from pydantic import BaseModel
-from enum import StrEnum
+from typing import Literal
+from typing import Union
+from typing_extensions import Annotated
 
-
-class StreamEventType(StrEnum):
-    TEXT_DELTA = "text_delta"
-    THINKING_DELTA = "thinking_delta"
-    MEDIA_DELTA = "media_delta"
+from pydantic import BaseModel, Field
 
 
 class TextDelta(BaseModel):
-    type: StreamEventType = StreamEventType.TEXT_DELTA
+    type: Literal["TextDelta"] = "TextDelta"
     text: str
 
 
 class ThinkingDelta(BaseModel):
-    type: StreamEventType = StreamEventType.THINKING_DELTA
+    type: Literal["ThinkingDelta"] = "ThinkingDelta"
     thinking: str
 
 
 class MediaDelta(BaseModel):
-    type: StreamEventType = StreamEventType.MEDIA_DELTA
+    type: Literal["MediaDelta"] = "MediaDelta"
     media_type: str
     data: str
 
 
-StreamDelta = TextDelta | ThinkingDelta | MediaDelta
+class StreamDelta(BaseModel):
+    type: Literal["StreamDelta"] = "StreamDelta"
+    delta: Annotated[
+        Union[TextDelta, ThinkingDelta, MediaDelta], Field(discriminator="type")
+    ]

@@ -1,55 +1,47 @@
-from pydantic import BaseModel
 from enum import StrEnum
 from typing import Any
+from typing import Annotated
+from typing import Literal
+from typing import Union
 
-
-class ContentType(StrEnum):
-    TEXT = "text"
-    MEDIA = "media"
-    TOOL_CALL = "tool_call"
-    TOOL_RESPONSE = "tool_response"
-    THINKING = "thinking"
-    ERROR = "error"
-
-
-class SourceType(StrEnum):
-    BYTES = "base64"
-    URL = "url"
-    REFERENCE = "reference"
+from pydantic import BaseModel
+from pydantic import Field
 
 
 class Base64Source(BaseModel):
-    type: SourceType = SourceType.BYTES
+    type: Literal["Bytes"] = "Bytes"
     data: str
 
 
 class UrlSource(BaseModel):
-    type: SourceType = SourceType.URL
+    type: Literal["URL"] = "URL"
     url: str
 
 
 class ReferenceSource(BaseModel):
-    type: SourceType = SourceType.REFERENCE
+    type: Literal["Reference"] = "Reference"
     id: str
 
 
-MediaSource = Base64Source | UrlSource | ReferenceSource
+MediaSource = Annotated[
+    Union[Base64Source, UrlSource, ReferenceSource], Field(discriminator="type")
+]
 
 
 class TextContent(BaseModel):
-    type: ContentType = ContentType.TEXT
+    type: Literal["TextContent"] = "TextContent"
     text: str
 
 
 class MediaContent(BaseModel):
-    type: ContentType = ContentType.MEDIA
+    type: Literal["MediaContent"] = "MediaContent"
     media_type: str
     source: MediaSource
     title: str | None = None
 
 
 class ToolCallContent(BaseModel):
-    type: ContentType = ContentType.TOOL_CALL
+    type: Literal["ToolCallContent"] = "ToolCallContent"
     id: str
     name: str
     arguments: dict[str, Any]
@@ -57,31 +49,34 @@ class ToolCallContent(BaseModel):
 
 
 class ToolResponseContent(BaseModel):
-    type: ContentType = ContentType.TOOL_RESPONSE
+    type: Literal["ToolResponseContent"] = "ToolResponseContent"
     tool_call_id: str
     content: str
     is_error: bool = False
 
 
 class ThinkingContent(BaseModel):
-    type: ContentType = ContentType.THINKING
+    type: Literal["ThinkingContent"] = "ThinkingContent"
     thinking: str
     signature: str | None = None
 
 
 class ErrorContent(BaseModel):
-    type: ContentType = ContentType.ERROR
+    type: Literal["ErrorContent"] = "ErrorContent"
     message: str
 
 
-Content = (
-    TextContent
-    | MediaContent
-    | ToolCallContent
-    | ToolResponseContent
-    | ThinkingContent
-    | ErrorContent
-)
+Content = Annotated[
+    Union[
+        TextContent,
+        MediaContent,
+        ToolCallContent,
+        ToolResponseContent,
+        ThinkingContent,
+        ErrorContent,
+    ],
+    Field(discriminator="type"),
+]
 
 
 class MessageSource(StrEnum):

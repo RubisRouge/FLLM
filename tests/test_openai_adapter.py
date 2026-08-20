@@ -29,6 +29,7 @@ from fllme.models.output import (
     GenerationOutput,
     TextDelta,
     ThinkingDelta,
+    StreamDelta,
 )
 from fllme.providers.openai.azure_v1 import OpenAIAzureV1
 from fllme.providers.openai.azure_v2 import OpenAIAzureV2
@@ -340,10 +341,12 @@ class TestParseStream:
             results.append(item)
 
         assert len(results) == 3
-        assert isinstance(results[0], TextDelta)
-        assert results[0].text == "Hello"
-        assert isinstance(results[1], TextDelta)
-        assert results[1].text == " world"
+        assert isinstance(results[0], StreamDelta)
+        assert isinstance(results[0].delta, TextDelta)
+        assert results[0].delta.text == "Hello"
+        assert isinstance(results[1], StreamDelta)
+        assert isinstance(results[1].delta, TextDelta)
+        assert results[1].delta.text == " world"
         assert isinstance(results[2], GenerationOutput)
         out: GenerationOutput = results[2]
         assert out.finish_reason == FinishReason.STOP
@@ -394,10 +397,12 @@ class TestParseStream:
         async for item in adapter.parse_stream(_lines_from(chunks)):
             results.append(item)
 
-        assert isinstance(results[0], ThinkingDelta)
-        assert results[0].thinking == "thinking..."
-        assert isinstance(results[1], TextDelta)
-        assert results[1].text == "Answer"
+        assert isinstance(results[0], StreamDelta)
+        assert isinstance(results[0].delta, ThinkingDelta)
+        assert results[0].delta.thinking == "thinking..."
+        assert isinstance(results[1], StreamDelta)
+        assert isinstance(results[1].delta, TextDelta)
+        assert results[1].delta.text == "Answer"
         out: GenerationOutput = results[2]
         assert out.usage.thinking_tokens == 20
 
@@ -489,7 +494,7 @@ class TestParseStream:
         async for item in adapter.parse_stream(lines()):
             results.append(item)
 
-        assert isinstance(results[0], TextDelta)
+        assert isinstance(results[0], StreamDelta)
         assert isinstance(results[1], GenerationOutput)
 
     @pytest.mark.asyncio

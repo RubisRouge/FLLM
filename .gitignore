@@ -8,4 +8,5 @@ __pycache__/
 .venv
 CLAUDE.md
 fllme.egg-info/
+poc/
 wip/

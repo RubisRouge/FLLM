@@ -269,7 +269,9 @@ class AnthropicVertexV1:
                         case "thinking_delta":
                             thinking = delta.get("thinking", "")
                             if thinking:
-                                yield ThinkingDelta(thinking=thinking)
+                                yield StreamDelta(
+                                    delta=ThinkingDelta(thinking=thinking)
+                                )
                                 accumulate_content(
                                     accumulated, ThinkingContent(thinking=thinking)
                                 )
@@ -285,7 +287,7 @@ class AnthropicVertexV1:
                         case "text_delta":
                             text = delta.get("text", "")
                             if text:
-                                yield TextDelta(text=text)
+                                yield StreamDelta(delta=TextDelta(text=text))
                                 accumulate_content(accumulated, TextContent(text=text))
                         case "input_json_delta":
                             if tool_acc is not None:

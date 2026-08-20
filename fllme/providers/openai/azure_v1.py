@@ -237,11 +237,11 @@ class OpenAIAzureV1:
                 delta = choice.get("delta", {})
 
                 if reasoning := delta.get("reasoning_content"):
-                    yield ThinkingDelta(thinking=reasoning)
+                    yield StreamDelta(delta=ThinkingDelta(thinking=reasoning))
                     accumulate_content(accumulated, ThinkingContent(thinking=reasoning))
 
                 if text := delta.get("content"):
-                    yield TextDelta(text=text)
+                    yield StreamDelta(delta=TextDelta(text=text))
                     accumulate_content(accumulated, TextContent(text=text))
 
                 for tc in delta.get("tool_calls", []):
