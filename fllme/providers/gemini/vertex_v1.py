@@ -156,17 +156,17 @@ class GeminiVertexV1:
                         sig = part.get("thoughtSignature") or part.get(
                             "thought_signature"
                         )
-                        yield ThinkingDelta(thinking=text)
+                        yield StreamDelta(delta=ThinkingDelta(thinking=text))
                         accumulate_content(
                             accumulated, ThinkingContent(thinking=text, signature=sig)
                         )
                     elif text := part.get("text"):
-                        yield TextDelta(text=text)
+                        yield StreamDelta(delta=TextDelta(text=text))
                         accumulate_content(accumulated, TextContent(text=text))
                     elif inline := part.get("inlineData"):
                         mime = inline.get("mimeType", "application/octet-stream")
                         data = inline.get("data", "")
-                        yield MediaDelta(media_type=mime, data=data)
+                        yield StreamDelta(delta=MediaDelta(media_type=mime, data=data))
                         accumulated.append(
                             MediaContent(
                                 media_type=mime,

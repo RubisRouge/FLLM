@@ -229,7 +229,7 @@ class MistralVertexV1:
                 delta = choice.get("delta", {})
 
                 if text := delta.get("content"):
-                    yield TextDelta(text=text)
+                    yield StreamDelta(delta=TextDelta(text=text))
                     accumulate_content(accumulated, TextContent(text=text))
 
                 for tc in delta.get("tool_calls", []):

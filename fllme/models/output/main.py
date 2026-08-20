@@ -1,9 +1,15 @@
-from pydantic import BaseModel
 from enum import StrEnum
+from typing import Annotated
+from typing import Literal
+from typing import Union
 
-from .usage import Usage
+from pydantic import BaseModel
+from pydantic import Field
+
 from .citation import Citation
 from .safety import SafetyResult
+from .stream import StreamDelta
+from .usage import Usage
 from ..message import Message
 
 
@@ -16,6 +22,8 @@ class FinishReason(StrEnum):
 
 
 class GenerationOutput(BaseModel):
+    type: Literal["GenerationOutput"] = "GenerationOutput"
+
     id: str
     model: str
     message: Message
@@ -24,3 +32,9 @@ class GenerationOutput(BaseModel):
     citations: list[Citation] = []
     safety: SafetyResult | None = None
     created: int | None = None
+
+
+class Response(BaseModel):
+    content: Annotated[
+        Union[GenerationOutput, StreamDelta], Field(discriminator="type")
+    ]
