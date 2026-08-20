@@ -1,7 +1,7 @@
-from enum import StrEnum
 from typing import Literal
 from typing import Union
 from typing_extensions import Annotated
+
 from pydantic import BaseModel, Field
 
 
