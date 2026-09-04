@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from fllme.errors import SerializationError
 from fllme.models.input import (
     GenerationInput,
     LLMConfig,
@@ -13,6 +14,7 @@ from fllme.models.input import (
     Tool,
     ToolsCallingMode,
     ToolsConfig,
+    WebSearchTool,
 )
 from fllme.models.message import (
     Base64Source,
@@ -222,6 +224,21 @@ class TestSerialize:
         assert payload["tools"][0]["function"]["name"] == "get_weather"
         assert payload["tool_choice"] == "auto"
         assert payload["parallel_tool_calls"] is True
+
+    def test_web_search_tool_raises(self) -> None:
+        adapter = OpenAIAzureV1()
+        inp = _simple_input()
+        inp = inp.model_copy(
+            update={
+                "tool_config": ToolsConfig(
+                    tools=[WebSearchTool()],
+                    parallel_calling=False,
+                    mode=ToolsCallingMode.AUTO,
+                ),
+            }
+        )
+        with pytest.raises(SerializationError):
+            adapter.serialize(inp)
 
     def test_tool_response_serialization(self) -> None:
         adapter = OpenAIAzureV1()

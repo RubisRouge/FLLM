@@ -25,8 +25,10 @@ from .input import (
     Resolution,
     ThinkingLevel,
     Tool,
+    ToolDefinition,
     ToolsCallingMode,
     ToolsConfig,
+    WebSearchTool,
 )
 from .auth import AuthPrinciple
 from .deployment import AdapterType, Deployment
@@ -91,9 +93,11 @@ __all__ = [
     "ThinkingLevel",
     "Tool",
     "ToolCallContent",
+    "ToolDefinition",
     "ToolResponseContent",
     "ToolsCallingMode",
     "ToolsConfig",
     "UrlSource",
     "Usage",
+    "WebSearchTool",
 ]

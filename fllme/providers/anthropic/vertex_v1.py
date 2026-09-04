@@ -6,8 +6,15 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-from ...models.input import GenerationInput, ThinkingLevel, ToolsCallingMode
+from ...models.input import (
+    GenerationInput,
+    ThinkingLevel,
+    Tool,
+    ToolsCallingMode,
+    WebSearchTool,
+)
 from ..base import accumulate_content
+from ...errors import SerializationError
 from ...models.message import (
     Base64Source,
     Content,
@@ -186,13 +193,23 @@ class AnthropicVertexV1:
         if gen_input.tool_config and gen_input.tool_config.tools:
             tools: list[dict[str, Any]] = []
             for tool in gen_input.tool_config.tools:
-                tools.append(
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "input_schema": tool.parameters,
-                    }
-                )
+                match tool:
+                    case Tool(
+                        name=name, description=description, parameters=parameters
+                    ):
+                        tools.append(
+                            {
+                                "name": name,
+                                "description": description,
+                                "input_schema": parameters,
+                            }
+                        )
+                    case WebSearchTool():
+                        error_msg = (
+                            "Web search tool is not supported by the Anthropic "
+                            "Vertex adapter"
+                        )
+                        raise SerializationError(error_msg)
             payload["tools"] = tools
 
             match gen_input.tool_config.mode:
