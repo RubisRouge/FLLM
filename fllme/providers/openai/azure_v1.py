@@ -6,8 +6,15 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-from ...models.input import GenerationInput, ThinkingLevel, ToolsCallingMode
+from ...models.input import (
+    GenerationInput,
+    ThinkingLevel,
+    Tool,
+    ToolsCallingMode,
+    WebSearchTool,
+)
 from ..base import accumulate_content
+from ...errors import SerializationError
 from ...models.message import (
     Base64Source,
     Content,
@@ -174,16 +181,26 @@ class OpenAIAzureV1:
         if gen_input.tool_config and gen_input.tool_config.tools:
             tools: list[dict[str, Any]] = []
             for tool in gen_input.tool_config.tools:
-                tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": tool.parameters,
-                        },
-                    }
-                )
+                match tool:
+                    case Tool(
+                        name=name, description=description, parameters=parameters
+                    ):
+                        tools.append(
+                            {
+                                "type": "function",
+                                "function": {
+                                    "name": name,
+                                    "description": description,
+                                    "parameters": parameters,
+                                },
+                            }
+                        )
+                    case WebSearchTool():
+                        error_msg = (
+                            "Web search tool is not supported by the OpenAI "
+                            "Azure adapter"
+                        )
+                        raise SerializationError(error_msg)
             payload["tools"] = tools
             payload["parallel_tool_calls"] = gen_input.tool_config.parallel_calling
             payload["tool_choice"] = _TOOL_MODE_MAP[gen_input.tool_config.mode]

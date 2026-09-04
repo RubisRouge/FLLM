@@ -13,6 +13,7 @@ from fllme.models.input import (
     Tool,
     ToolsCallingMode,
     ToolsConfig,
+    WebSearchTool,
 )
 from fllme.models.message import (
     Base64Source,
@@ -26,6 +27,7 @@ from fllme.models.message import (
     UrlSource,
 )
 from fllme.models.output import (
+    CitationType,
     FinishReason,
     GenerationOutput,
     StreamDelta,
@@ -217,6 +219,70 @@ class TestSerialize:
         decls = payload["tools"][0]["functionDeclarations"]
         assert len(decls) == 1
         assert decls[0]["name"] == "get_weather"
+        assert payload["toolConfig"] == {
+            "functionCallingConfig": {"mode": "AUTO"},
+        }
+
+    def test_web_search_tool_serialization(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = _simple_input()
+        inp = inp.model_copy(
+            update={
+                "tool_config": ToolsConfig(
+                    tools=[WebSearchTool()],
+                    parallel_calling=False,
+                    mode=ToolsCallingMode.AUTO,
+                ),
+            }
+        )
+        payload = adapter.serialize(inp)
+        assert payload["tools"] == [{"enterpriseWebSearch": {}}]
+        assert "toolConfig" not in payload
+
+    def test_web_search_tool_with_excluded_domains(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = _simple_input()
+        inp = inp.model_copy(
+            update={
+                "tool_config": ToolsConfig(
+                    tools=[WebSearchTool(exclude_domains=["example.com"])],
+                    parallel_calling=False,
+                    mode=ToolsCallingMode.AUTO,
+                ),
+            }
+        )
+        payload = adapter.serialize(inp)
+        assert payload["tools"] == [
+            {"enterpriseWebSearch": {"excludeDomains": ["example.com"]}},
+        ]
+
+    def test_web_search_and_function_tools_combined(self) -> None:
+        adapter = GeminiVertexV1()
+        inp = _simple_input()
+        inp = inp.model_copy(
+            update={
+                "tool_config": ToolsConfig(
+                    tools=[
+                        Tool(
+                            name="get_weather",
+                            description="Get weather.",
+                            parameters={
+                                "type": "object",
+                                "properties": {"city": {"type": "string"}},
+                                "required": ["city"],
+                            },
+                        ),
+                        WebSearchTool(),
+                    ],
+                    parallel_calling=True,
+                    mode=ToolsCallingMode.AUTO,
+                ),
+            }
+        )
+        payload = adapter.serialize(inp)
+        assert len(payload["tools"]) == 2
+        assert payload["tools"][0]["functionDeclarations"][0]["name"] == "get_weather"
+        assert payload["tools"][1] == {"enterpriseWebSearch": {}}
         assert payload["toolConfig"] == {
             "functionCallingConfig": {"mode": "AUTO"},
         }
@@ -491,6 +557,61 @@ class TestParseStream:
         assert out.finish_reason == FinishReason.CONTENT_FILTER
         assert out.safety is not None
         assert out.safety.blocked is True
+
+    @pytest.mark.asyncio
+    async def test_grounding_metadata_parsed_to_citations(self) -> None:
+        adapter = GeminiVertexV1()
+        chunks: list[dict[str, Any]] = [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": "Paris is the capital of France."}],
+                            "role": "model",
+                        },
+                        "finishReason": "STOP",
+                        "groundingMetadata": {
+                            "groundingChunks": [
+                                {
+                                    "web": {
+                                        "uri": "https://example.com/paris",
+                                        "title": "Paris - Wikipedia",
+                                    },
+                                },
+                            ],
+                            "groundingSupports": [
+                                {
+                                    "segment": {
+                                        "startIndex": 0,
+                                        "endIndex": 32,
+                                        "text": "Paris is the capital of France.",
+                                    },
+                                    "groundingChunkIndices": [0],
+                                },
+                            ],
+                        },
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 5,
+                    "candidatesTokenCount": 8,
+                    "totalTokenCount": 13,
+                },
+            },
+        ]
+
+        results: list[Any] = []
+        async for item in adapter.parse_stream(_lines_from(chunks)):
+            results.append(item)
+
+        out: GenerationOutput = results[-1]
+        assert len(out.citations) == 1
+        citation = out.citations[0]
+        assert citation.type == CitationType.SEARCH
+        assert citation.url == "https://example.com/paris"
+        assert citation.title == "Paris - Wikipedia"
+        assert citation.span is not None
+        assert citation.span.text == "Paris is the capital of France."
 
     @pytest.mark.asyncio
     async def test_skips_non_sse_lines(self) -> None:

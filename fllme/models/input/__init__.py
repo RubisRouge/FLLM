@@ -5,7 +5,7 @@ from .main import (
     OutputType,
     ThinkingLevel,
 )
-from .tools import Tool, ToolsCallingMode, ToolsConfig
+from .tools import Tool, ToolDefinition, ToolsCallingMode, ToolsConfig, WebSearchTool
 from .image import (
     ImageConfig,
     MimeType,
@@ -26,6 +26,8 @@ __all__ = [
     "Resolution",
     "ThinkingLevel",
     "Tool",
+    "ToolDefinition",
     "ToolsCallingMode",
     "ToolsConfig",
+    "WebSearchTool",
 ]

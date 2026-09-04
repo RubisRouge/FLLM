@@ -9,7 +9,9 @@ from ...models.input import (
     BasicOutputType,
     GenerationInput,
     ThinkingLevel,
+    Tool,
     ToolsCallingMode,
+    WebSearchTool,
 )
 from ..base import accumulate_content
 from ...models.message import (
@@ -25,6 +27,8 @@ from ...models.message import (
     UrlSource,
 )
 from ...models.output import (
+    Citation,
+    CitationType,
     FinishReason,
     GenerationOutput,
     MediaDelta,
@@ -34,6 +38,7 @@ from ...models.output import (
     SafetySeverity,
     StreamDelta,
     TextDelta,
+    TextSpan,
     ThinkingDelta,
     Usage,
 )
@@ -103,21 +108,35 @@ class GeminiVertexV1:
 
         if gen_input.tool_config and gen_input.tool_config.tools:
             func_decls: list[dict[str, Any]] = []
+            tool_entries: list[dict[str, Any]] = []
             for tool in gen_input.tool_config.tools:
-                decl: dict[str, Any] = {
-                    "name": tool.name,
-                    "description": tool.description,
-                }
-                if tool.parameters:
-                    decl["parameters"] = tool.parameters
-                func_decls.append(decl)
-            payload["tools"] = [{"functionDeclarations": func_decls}]
+                match tool:
+                    case WebSearchTool(exclude_domains=exclude_domains):
+                        web_search: dict[str, Any] = {}
+                        if exclude_domains:
+                            web_search["excludeDomains"] = exclude_domains
+                        tool_entries.append({"enterpriseWebSearch": web_search})
+                    case Tool(
+                        name=name, description=description, parameters=parameters
+                    ):
+                        decl: dict[str, Any] = {
+                            "name": name,
+                            "description": description,
+                        }
+                        if parameters:
+                            decl["parameters"] = parameters
+                        func_decls.append(decl)
 
-            mode = _TOOL_MODE_MAP.get(gen_input.tool_config.mode)
-            if mode:
-                payload["toolConfig"] = {
-                    "functionCallingConfig": {"mode": mode},
-                }
+            if func_decls:
+                tool_entries.insert(0, {"functionDeclarations": func_decls})
+            payload["tools"] = tool_entries
+
+            if func_decls:
+                mode = _TOOL_MODE_MAP.get(gen_input.tool_config.mode)
+                if mode:
+                    payload["toolConfig"] = {
+                        "functionCallingConfig": {"mode": mode},
+                    }
 
         return payload
 
@@ -129,6 +148,7 @@ class GeminiVertexV1:
         finish_reason = FinishReason.STOP
         usage_meta: dict[str, Any] = {}
         safety_ratings: list[dict[str, Any]] = []
+        grounding_meta: dict[str, Any] = {}
         model_name = ""
         has_tool_calls = False
 
@@ -150,6 +170,9 @@ class GeminiVertexV1:
 
                 if ratings := candidate.get("safetyRatings"):
                     safety_ratings = ratings
+
+                if gm := candidate.get("groundingMetadata"):
+                    grounding_meta = gm
 
                 for part in candidate.get("content", {}).get("parts", []):
                     if part.get("thought") and (text := part.get("text")):
@@ -203,6 +226,7 @@ class GeminiVertexV1:
         )
 
         safety = _parse_safety_ratings(safety_ratings) if safety_ratings else None
+        citations = _parse_grounding_metadata(grounding_meta) if grounding_meta else []
 
         yield GenerationOutput(
             id=uuid.uuid4().hex,
@@ -211,6 +235,7 @@ class GeminiVertexV1:
             finish_reason=finish_reason,
             usage=usage,
             safety=safety,
+            citations=citations,
         )
 
 
@@ -327,3 +352,28 @@ def _parse_safety_ratings(ratings: list[dict[str, Any]]) -> SafetyResult:
             )
         )
     return SafetyResult(ratings=parsed, blocked=blocked)
+
+
+def _parse_grounding_metadata(grounding: dict[str, Any]) -> list[Citation]:
+    chunks = grounding.get("groundingChunks", [])
+    citations: list[Citation] = []
+    for support in grounding.get("groundingSupports", []):
+        segment = support.get("segment", {})
+        span = TextSpan(
+            start=segment.get("startIndex", 0),
+            end=segment.get("endIndex", 0),
+            text=segment.get("text"),
+        )
+        for idx in support.get("groundingChunkIndices", []):
+            if idx >= len(chunks):
+                continue
+            web = chunks[idx].get("web", {})
+            citations.append(
+                Citation(
+                    type=CitationType.SEARCH,
+                    url=web.get("uri"),
+                    title=web.get("title"),
+                    span=span,
+                )
+            )
+    return citations
